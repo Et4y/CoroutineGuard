@@ -1,0 +1,6 @@
+<!--
+  No-op implementation of CoroutineGuard.
+  This manifest is intentionally minimal — no components, no permissions, no services.
+  Critically: no <service> or provider entries that could trigger class loading.
+-->
+<manifest package="com.coroutineguard.noop" />

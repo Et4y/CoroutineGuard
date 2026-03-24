@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CancellationException
 
 /**
  * GuardInterceptor is the engine of CoroutineGuard. It is automatically injected into

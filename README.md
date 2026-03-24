@@ -1,6 +1,6 @@
 # CoroutineGuard
 
-[![CI](https://github.com/YOUR_USERNAME/CoroutineGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/CoroutineGuard/actions/workflows/ci.yml)
+[![CI](https://github.com/Et4y/CoroutineGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/Et4y/CoroutineGuard/actions/workflows/ci.yml)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-API_24%2B-3DDC84?logo=android&logoColor=white)
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue)
@@ -33,8 +33,8 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    debugImplementation("com.github.YOUR_USERNAME.CoroutineGuard:android:1.0.0")
-    releaseImplementation("com.github.YOUR_USERNAME.CoroutineGuard:no-op:1.0.0")
+    debugImplementation("com.github.Et4y.CoroutineGuard:android:1.0.0")
+    releaseImplementation("com.github.Et4y.CoroutineGuard:no-op:1.0.0")
 }
 ```
 
@@ -95,7 +95,7 @@ Add the reporter artifact for ready-made integrations with crash tools:
 
 ```kotlin
 // app/build.gradle.kts
-debugImplementation("com.github.YOUR_USERNAME.CoroutineGuard:reporter:1.0.0")
+debugImplementation("com.github.Et4y.CoroutineGuard:reporter:1.0.0")
 ```
 
 ### Firebase Crashlytics
@@ -167,11 +167,11 @@ CoroutineGuard is built for zero release overhead — not just skipped logic, bu
 dependencies {
     // Full implementation: ServiceLoader registers GuardInterceptor into every coroutine,
     // lifecycle observer detects scope leaks, DefaultDebugReporter logs to Logcat.
-    debugImplementation("com.github.YOUR_USERNAME.CoroutineGuard:android:1.0.0")
+    debugImplementation("com.github.Et4y.CoroutineGuard:android:1.0.0")
 
     // No-op stub: identical API surface, empty function bodies, no ServiceLoader file.
     // The JIT compiler inlines the install() call away after the first few invocations.
-    releaseImplementation("com.github.YOUR_USERNAME.CoroutineGuard:no-op:1.0.0")
+    releaseImplementation("com.github.Et4y.CoroutineGuard:no-op:1.0.0")
 }
 ```
 
@@ -231,7 +231,7 @@ JVM startup
 ## License
 
 ```
-Copyright 2024 YOUR_USERNAME
+Copyright 2024 Et4y
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

@@ -49,7 +49,26 @@ class MyApp : Application() {
 }
 ```
 
-**Step 3** — That's it. Hang, silent-cancel, and scope-leak events now appear in Logcat tagged `CoroutineGuard`.
+**Step 3** — Use `guardedScope` instead of `viewModelScope` in your ViewModels:
+
+```kotlin
+class OrdersViewModel : ViewModel() {
+    fun loadOrders() = guardedScope.launch {
+        // monitored automatically ✅
+        // label = "OrdersViewModel" auto-detected ✅
+    }
+}
+```
+
+Works with any base class — no forced hierarchy change:
+
+```kotlin
+class OrdersViewModel : BaseViewModelV2<OrdersState>() {
+    fun loadOrders() = guardedScope.launch { ... }
+}
+```
+
+That's it. Hang, silent-cancel, and scope-leak events now appear in Logcat tagged `CoroutineGuard`.
 
 ---
 
@@ -79,12 +98,17 @@ CoroutineGuardAndroid.install(
 )
 ```
 
-Label values come from [`CoroutineName`](https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines/-coroutine-name/):
+Label values are auto-detected from the ViewModel class name when using `guardedScope`. You can also pass an explicit label via the lower-level `guarded()` extension:
 
 ```kotlin
-launch(CoroutineName("sync-orders")) {
-    // if this hangs, onHang receives label = "sync-orders"
-}
+// guardedScope → label auto-detected as "OrdersViewModel"
+guardedScope.launch { ... }
+
+// guarded() → explicit label for non-ViewModel scopes
+someScope.guarded("sync-orders").launch { ... }
+
+// CoroutineName → label for individual coroutines
+guardedScope.launch(CoroutineName("fetch-user")) { ... }
 ```
 
 ---
@@ -165,12 +189,12 @@ CoroutineGuard is built for zero release overhead — not just skipped logic, bu
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    // Full implementation: ServiceLoader registers GuardInterceptor into every coroutine,
+    // Full implementation: GuardInterceptor is injected via guardedScope,
     // lifecycle observer detects scope leaks, DefaultDebugReporter logs to Logcat.
     debugImplementation("com.github.Et4y.CoroutineGuard:android:1.0.0")
 
-    // No-op stub: identical API surface, empty function bodies, no ServiceLoader file.
-    // The JIT compiler inlines the install() call away after the first few invocations.
+    // No-op stub: identical API surface, guardedScope returns viewModelScope unchanged,
+    // install() is an empty function. The JIT eliminates all calls after inlining.
     releaseImplementation("com.github.Et4y.CoroutineGuard:no-op:1.0.0")
 }
 ```
@@ -184,9 +208,9 @@ If you want monitoring in production, use `debugImplementation` for both and set
 ## How It Works
 
 ```
-JVM startup
-  └─ ServiceLoader reads META-INF/services/kotlinx.coroutines.CoroutineContextElement
-       └─ GuardInterceptor is placed into the global default CoroutineContext
+ViewModel.guardedScope
+  └─ viewModelScope.guarded("OrdersViewModel")
+       └─ CoroutineScope(viewModelScope.coroutineContext + GuardInterceptor())
             │
             ├─ launch { } / async { }
             │    └─ copyForChild() → new GuardInterceptor instance
@@ -194,16 +218,16 @@ JVM startup
             │
             └─ coroutine resumes (first time)
                  └─ updateThreadContext() → job.invokeOnCompletion { }
-                      ├─ duration > threshold?       → onHang
+                      ├─ duration > threshold?              → onHang
                       ├─ CancellationException(cause=null)? → onSilentCancel
                       └─ job.children.any { isActive }?     → onScopeLeak
 ```
 
-**ServiceLoader** — `GuardInterceptor` is registered once at JVM startup via a `META-INF/services` file. `CoroutineGuard.install()` does not register anything; it only writes the config into a `@Volatile` field that the already-loaded interceptor reads on each coroutine completion.
+**`guardedScope`** — Extension property on `ViewModel`. Calls `viewModelScope.guarded(simpleName)` which wraps the existing scope with a fresh `GuardInterceptor` in the coroutine context. No global registration, no `ServiceLoader`, no static state.
 
 **`copyForChild()`** — `GuardInterceptor` implements `CopyableThreadContextElement`. Every `launch` or `async` call triggers `copyForChild()`, which creates a fresh `GuardInterceptor` instance for the child coroutine with its own `startTime`. Without this, all coroutines would share the parent's start time and the single `invokeOnCompletion` listener.
 
-**`:no-op`** — Contains no `META-INF/services` file. The `GuardInterceptor` class does not exist in the release APK's classpath. `ServiceLoader` finds nothing to load. `install()` is an empty function. Total overhead: one function call that the JIT eliminates.
+**`:no-op`** — `guardedScope` returns `viewModelScope` unchanged. `GuardInterceptor` does not exist in the release APK's classpath. `install()` is an empty function. Total overhead: one property access that the JIT eliminates.
 
 ---
 
@@ -214,7 +238,7 @@ JVM startup
 | `:core` | `kotlin.jvm` | — | `GuardInterceptor`, `CoroutineGuard`, `CoroutineGuardConfig`, exception types |
 | `:android` | `android.library` | `:core` | `CoroutineGuardAndroid.install()`, lifecycle observer, Logcat reporter |
 | `:reporter` | `android.library` | `:core` | `CoroutineGuardReporter` interface, `FirebaseReporter`, `SentryReporter`, `CompositeReporter` |
-| `:no-op` | `android.library` | — | Zero-cost stubs; identical API surface to `:android`; no ServiceLoader file |
+| `:no-op` | `android.library` | — | Zero-cost stubs; identical API surface to `:android`; `guardedScope` returns `viewModelScope` unchanged |
 
 ---
 

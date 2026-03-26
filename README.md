@@ -33,8 +33,8 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    debugImplementation("com.github.Et4y.CoroutineGuard:android:1.0.0")
-    releaseImplementation("com.github.Et4y.CoroutineGuard:no-op:1.0.0")
+    debugImplementation("com.github.Et4y.CoroutineGuard:android:latest.release")
+    releaseImplementation("com.github.Et4y.CoroutineGuard:no-op:latest.release")
 }
 ```
 
@@ -52,19 +52,13 @@ class MyApp : Application() {
 **Step 3** — Use `guardedScope` instead of `viewModelScope` in your ViewModels:
 
 ```kotlin
+import com.coroutineguard.android.guardedScope
+
 class OrdersViewModel : ViewModel() {
     fun loadOrders() = guardedScope.launch {
         // monitored automatically ✅
         // label = "OrdersViewModel" auto-detected ✅
     }
-}
-```
-
-Works with any base class — no forced hierarchy change:
-
-```kotlin
-class OrdersViewModel : BaseViewModelV2<OrdersState>() {
-    fun loadOrders() = guardedScope.launch { ... }
 }
 ```
 
@@ -119,7 +113,7 @@ Add the reporter artifact for ready-made integrations with crash tools:
 
 ```kotlin
 // app/build.gradle.kts
-debugImplementation("com.github.Et4y.CoroutineGuard:reporter:1.0.0")
+debugImplementation("com.github.Et4y.CoroutineGuard:reporter:latest.release")
 ```
 
 ### Firebase Crashlytics
@@ -191,17 +185,17 @@ CoroutineGuard is built for zero release overhead — not just skipped logic, bu
 dependencies {
     // Full implementation: GuardInterceptor is injected via guardedScope,
     // lifecycle observer detects scope leaks, DefaultDebugReporter logs to Logcat.
-    debugImplementation("com.github.Et4y.CoroutineGuard:android:1.0.0")
+    debugImplementation("com.github.Et4y.CoroutineGuard:android:latest.release")
 
     // No-op stub: identical API surface, guardedScope returns viewModelScope unchanged,
     // install() is an empty function. The JIT eliminates all calls after inlining.
-    releaseImplementation("com.github.Et4y.CoroutineGuard:no-op:1.0.0")
+    releaseImplementation("com.github.Et4y.CoroutineGuard:no-op:latest.release")
 }
 ```
 
 The two modules share the same package (`com.coroutineguard.android`) and identical function signatures, so app code compiles unchanged against either. They are never on the same classpath simultaneously.
 
-If you want monitoring in production, use `debugImplementation` for both and set `enableInProduction(true)` (the default) in your config.
+If you want monitoring in production, use `implementation` (not `debugImplementation`) for the `:android` artifact — `enableInProduction(true)` is the default, so no config change is needed.
 
 ---
 

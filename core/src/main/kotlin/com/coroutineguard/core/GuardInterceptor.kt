@@ -10,33 +10,46 @@ import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CancellationException
 
 /**
- * GuardInterceptor is the engine of CoroutineGuard. It is automatically injected into
- * EVERY coroutine context in the process without any developer opt-in.
+ * GuardInterceptor is the engine of CoroutineGuard. It tracks the lifecycle of every
+ * coroutine launched from a scope wrapped with [CoroutineScope.guarded].
  *
- * ─── How automatic injection works ───────────────────────────────────────────────────────
+ * ─── How injection works ──────────────────────────────────────────────────────────────────
  *
- * kotlinx-coroutines ships a ServiceLoader hook. Any class registered in:
- *   META-INF/services/kotlinx.coroutines.CoroutineContextElement
- * is instantiated once at library init time and placed into the *global default context*
- * (analogous to Dispatchers.Default being available everywhere).
+ * Injection is EXPLICIT, not automatic. The developer wraps a scope once:
  *
- * When a new coroutine is launched with launch/async/etc., the runtime calls
- * [copyForChild] on every CopyableThreadContextElement in the parent context.
- * The returned copy is placed into the CHILD coroutine's context.
- * This cascade happens transitively — every coroutine in the tree gets its own copy.
+ *   val scope = viewModelScope.guarded("OrdersViewModel")
+ *
+ * [CoroutineScope.guarded] places a GuardInterceptor into the scope's CoroutineContext.
+ * From that point, every child coroutine launched from the scope automatically receives
+ * its own fresh GuardInterceptor via [copyForChild] — no further developer action needed.
+ *
+ * ─── Why explicit injection and not ServiceLoader ─────────────────────────────────────────
+ *
+ * A META-INF/services/kotlinx.coroutines.CoroutineContextElement file was attempted.
+ * It silently failed on Android for three reasons:
+ *   1. `kotlinx.coroutines.CoroutineContextElement` is not a stable public API — it is
+ *      an internal JetBrains class whose service-loading behaviour is undocumented and
+ *      can change between coroutines releases.
+ *   2. AGP's AAR resource merger does not guarantee that META-INF/services/ entries from
+ *      transitive library dependencies are merged into the final APK in all configurations.
+ *   3. R8 can silently strip service entries it cannot prove are reachable.
+ *
+ * Explicit context composition via [guarded] has none of these failure modes: the
+ * interceptor is placed directly into the context at the call site, where it is
+ * immediately visible to the Kotlin runtime and immune to build-tool interference.
  *
  * ─── Why CopyableThreadContextElement and not just CoroutineContext.Element ─────────────
  *
  * A plain CoroutineContext.Element is SHARED between parent and child. A single shared
- * startTime would make hang detection meaningless (child would inherit parent's time).
- * CopyableThreadContextElement guarantees each coroutine gets a FRESH instance with its
- * own startTime. This is the same mechanism used by logging frameworks to propagate MDC.
+ * instance would mean all child coroutines share the parent's [startTime] and
+ * [listenerAttached] flag — hang detection would be meaningless and the observer would
+ * only ever attach once. CopyableThreadContextElement guarantees each coroutine launched
+ * from a guarded scope receives a FRESH instance with its own [startTime].
  *
- * ─── Why also extend AbstractCoroutineContextElement ───────────────────────────────────
+ * ─── Why also extend AbstractCoroutineContextElement ─────────────────────────────────────
  *
- * AbstractCoroutineContextElement handles the boilerplate for CoroutineContext.Element:
- * it accepts the Key in its constructor and provides the correct [key] override.
- * Without it, we'd have to implement fold/minusKey/plus manually.
+ * AbstractCoroutineContextElement provides the correct [key] override and implements
+ * fold/minusKey/plus. Without it we would have to implement those manually.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class GuardInterceptor : AbstractCoroutineContextElement(Key), CopyableThreadContextElement<GuardInterceptor> {

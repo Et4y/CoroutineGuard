@@ -11,13 +11,12 @@
 // only the android.library (or android.application) plugin provides. A kotlin.jvm module
 // cannot import android.app.Application.
 //
-// WHY no dependencies on :core:
-// :core contains META-INF/services/kotlinx.coroutines.CoroutineContextElement, which
-// registers GuardInterceptor via the ServiceLoader mechanism. If :no-op depended on :core,
-// that file would be merged into the final app's resources for the release build, causing
-// GuardInterceptor to be loaded and installed into every coroutine context — the exact
-// overhead this module exists to eliminate. By being dependency-free, :no-op guarantees
-// that no CoroutineContextElement registration file reaches the release APK.
+// WHY no dependency on :core (the library module):
+// :core is the module that contains GuardInterceptor, the ServiceLoader registration,
+// and the real CoroutineGuardConfig. If :no-op depended on :core, those classes and any
+// associated resources would be pulled into the release APK, defeating the purpose of
+// this module. All types that :no-op needs (CoroutineGuardConfig, guarded()) are
+// re-declared here as empty stubs in the same packages as the real implementations.
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
@@ -41,11 +40,11 @@ android {
     }
 }
 
-// Intentionally empty — no dependencies whatsoever.
-// The Android framework classes (Application, etc.) are provided by the compileSdk above,
-// not by an explicit Gradle dependency. Everything else the no-op needs is self-contained
-// in the stub classes defined in this module.
 dependencies {
+    // kotlinx-coroutines-core is the external JetBrains library — safe to add here.
+    // It does NOT contain the :core module's GuardInterceptor or any CoroutineContextElement
+    // ServiceLoader registration. Required for the CoroutineScope type in guarded().
+    implementation(libs.kotlinx.coroutines.core)
 }
 
 // ── Publishing ────────────────────────────────────────────────────────────────────────────

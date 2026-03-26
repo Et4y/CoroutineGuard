@@ -1,13 +1,14 @@
 package com.coroutineguard.core
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CopyableThreadContextElement
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
-import kotlinx.coroutines.CancellationException
 
 /**
  * GuardInterceptor is the engine of CoroutineGuard. It tracks the lifecycle of every
@@ -38,7 +39,7 @@ import kotlinx.coroutines.CancellationException
  * interceptor is placed directly into the context at the call site, where it is
  * immediately visible to the Kotlin runtime and immune to build-tool interference.
  *
- * ─── Why CopyableThreadContextElement and not just CoroutineContext.Element ─────────────
+ * ─── Why CopyableThreadContextElement and not just CoroutineContext.Element ──────────────
  *
  * A plain CoroutineContext.Element is SHARED between parent and child. A single shared
  * instance would mean all child coroutines share the parent's [startTime] and
@@ -51,7 +52,12 @@ import kotlinx.coroutines.CancellationException
  * AbstractCoroutineContextElement provides the correct [key] override and implements
  * fold/minusKey/plus. Without it we would have to implement those manually.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
+// CopyableThreadContextElement is both @ExperimentalCoroutinesApi and @DelicateCoroutinesApi
+// in kotlinx-coroutines 1.8.x. Both opt-ins are required to suppress the IDE warnings.
+// We accept both: the experimental risk is known and intentional; the "delicate" tag
+// signals that copyForChild / mergeForChild have subtle contracts — exactly why this file
+// has detailed KDoc on each override.
+@OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
 internal class GuardInterceptor : AbstractCoroutineContextElement(Key), CopyableThreadContextElement<GuardInterceptor> {
 
     companion object Key : CoroutineContext.Key<GuardInterceptor>
@@ -122,11 +128,11 @@ internal class GuardInterceptor : AbstractCoroutineContextElement(Key), Copyable
      * Called when the child's context ALREADY has a GuardInterceptor — for example,
      * the developer manually passed one via launch(guardInterceptor) { }.
      *
-     * We honour the explicit element over the inherited one. Returning [overwrittenElement]
+     * We honour the explicit element over the inherited one. Returning [overwritingElement]
      * tells the coroutine runtime to keep the child's version unchanged.
      */
-    override fun mergeForChild(overwrittenElement: CoroutineContext.Element): CoroutineContext.Element =
-        overwrittenElement
+    override fun mergeForChild(overwritingElement: CoroutineContext.Element): CoroutineContext.Element =
+        overwritingElement
 
     // ─── Lifecycle observation ────────────────────────────────────────────────────────────
 
@@ -145,8 +151,8 @@ internal class GuardInterceptor : AbstractCoroutineContextElement(Key), Copyable
             val config = CoroutineGuard.config ?: return@invokeOnCompletion
             val durationMs = System.currentTimeMillis() - startTime
 
-            when {
-                cause == null -> {
+            when (cause) {
+                null -> {
                     // ── Hang detection (normal completion) ────────────────────────────
                     // The coroutine finished successfully, but it blocked or ran longer
                     // than the configured threshold. Common culprits: blocking I/O called
@@ -156,7 +162,7 @@ internal class GuardInterceptor : AbstractCoroutineContextElement(Key), Copyable
                     }
                 }
 
-                cause is CancellationException -> {
+                is CancellationException -> {
                     // ── Hang detection (cancelled, but still took too long) ───────────
                     // A coroutine that was cancelled after a long delay is still a hang:
                     // it consumed resources for longer than expected before being killed.

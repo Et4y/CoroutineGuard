@@ -41,10 +41,11 @@ android {
 }
 
 dependencies {
-    // kotlinx-coroutines-core is the external JetBrains library — safe to add here.
-    // It does NOT contain the :core module's GuardInterceptor or any CoroutineContextElement
-    // ServiceLoader registration. Required for the CoroutineScope type in guarded().
+    // kotlinx-coroutines-core and lifecycle-viewmodel-ktx are external libraries — safe to
+    // add here. Neither contains :core module classes or ServiceLoader registrations.
+    // Required for CoroutineScope (guarded()) and viewModelScope (GuardedViewModelScopeDelegate).
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 }
 
 // ── Publishing ────────────────────────────────────────────────────────────────────────────
